@@ -1,0 +1,51 @@
+pool:
+  vmImage : windows-latest
+
+resources:
+  repositories:
+  - repository: ITDEV-APIToODS
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: main
+    trigger:
+    - main
+  - repository: ITDEV-APIToODS-Dev
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: Development
+    trigger:
+    - Development
+  - repository: ITDEV-APIToODS-Rel
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: Release
+    trigger:
+    - Release
+
+
+
+stages:
+
+- stage: build
+  condition: contains(variables['build.sourceBranch'], 'refs/heads/Development')
+  jobs:
+  - job: run_build
+    variables:
+      currentDate: $[ format('{0:yyyy}.{0:MM}.{0:dd}.{0:HH}', pipeline.startTime) ]
+
+
+    steps:
+    - checkout: ITDEV-APIToODS-Dev
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Src'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/Development/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+      
+    
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Publish files'
+      artifact: drop
+    
+
+
