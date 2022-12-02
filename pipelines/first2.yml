@@ -1,0 +1,211 @@
+trigger:
+- none
+pool:
+  vmImage : windows-latest
+
+resources:
+  repositories:
+  - repository: ITDEV-APIToODS
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: main
+    trigger:
+    - main
+  - repository: ITDEV-APIToODS-Dev
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: Development
+    trigger:
+    - Development
+  - repository: ITDEV-APIToODS-Rel
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: Release
+    trigger:
+    - Release
+
+
+
+stages:
+- stage: Prod_build
+  condition: contains(variables['Build.SourceBranch'], 'main')
+  jobs:
+  - job: Prod_build
+    variables:
+      currentDate: $[ format('{0:yyyy}.{0:MM}.{0:dd}.{0:HH}', pipeline.startTime) ]
+
+
+    steps:
+    - checkout: ITDEV-APIToODS
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Src'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Env/Production/'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+    
+
+
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Publish files'
+      artifact: Production
+
+- stage: Prod_Deploy
+  condition: succeeded('Prod_build')
+  variables:
+      - group: VariablesV1
+  jobs:
+    - deployment: 'Prod_Deploy'
+      displayName: 'Deploy the Artifact to PROD environment'
+      environment:
+       name: Prod
+       resourceType: VirtualMachine
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Write your PowerShell commands here.
+                
+                # cd $(IrisScriptPath)
+                
+                # .\Powershellscript.ps1 
+
+                # Start-Process -FilePath ".\iristerm" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr")
+                # Start-Process -FilePath ".\iristerm.exe" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr ADM XXX abc 1 Y")
+                # Start-Process -FilePath ".\iristerm.exe" /console=cn_ap:irishealth[USER] $(IrisScriptPath1)\Build-PR.script
+                Write-Host "End Terminal script"
+
+              failOnStderr: true
+
+          
+
+
+
+- stage: QA_build
+  condition: contains(variables['Build.SourceBranch'], 'Release')
+  jobs:
+  - job: QA_build
+    variables:
+      currentDate: $[ format('{0:yyyy}.{0:MM}.{0:dd}.{0:HH}', pipeline.startTime) ]
+
+
+    steps:
+    - checkout: ITDEV-APIToODS-Rel
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Src'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Env/Release/'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+      
+    
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Publish files'
+      artifact: Release
+
+- stage: QA_Deploy
+  condition: succeeded('QA_build')
+  variables:
+      - group: VariablesV1
+  jobs:
+    - deployment: 'QA_Deploy'
+      displayName: 'Deploy the Artifact to QA environment'
+      environment:
+       name: QA
+       resourceType: VirtualMachine
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Write your PowerShell commands here.
+                
+                cd $(IrisScriptPathQA)
+                
+                 .\Power.ps1 
+
+                # Start-Process -FilePath ".\iristerm" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr")
+                # Start-Process -FilePath ".\iristerm.exe" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr ADM XXX abc 1 Y")
+                # Start-Process -FilePath ".\iristerm.exe" /console=cn_ap:irishealth[USER] $(IrisScriptPath1)\Build-PR.script
+                Write-Host "End Terminal script"
+  
+  
+              failOnStderr: true
+
+
+
+
+
+
+
+- stage: Development_build
+  condition: contains(variables['Build.SourceBranch'], 'Development')
+  jobs:
+  - job: Development_build
+    variables:
+      currentDate: $[ format('{0:yyyy}.{0:MM}.{0:dd}.{0:HH}', pipeline.startTime) ]
+
+
+    steps:
+    - checkout: ITDEV-APIToODS-Dev
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Src'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/Development/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+      
+    
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Publish files'
+      artifact: Development
+
+- stage: Development_Deploy
+  condition: succeeded('Development_build')
+  variables:
+      - group: VariablesV1
+  jobs:
+    - deployment: 'Development_Deploy'
+      displayName: 'Deploy the Artifact to Development environment'
+      environment:
+       name: Development
+       resourceType: VirtualMachine
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Write your PowerShell commands here.
+                
+                cd $(IrisScriptPathDev)
+                
+                 .\Power.ps1 
+
+                # Start-Process -FilePath ".\iristerm" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr")
+                # Start-Process -FilePath ".\iristerm.exe" –ArgumentList @("/console=cn_iptcp:127.0.0.1[23]", "C:\TestScript.scr ADM XXX abc 1 Y")
+                # Start-Process -FilePath ".\iristerm.exe" /console=cn_ap:irishealth[USER] $(IrisScriptPath1)\Build-PR.script
+                Write-Host "End Terminal script"
+  
+  
+              failOnStderr: true
+        
+          
+
