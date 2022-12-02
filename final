@@ -1,0 +1,88 @@
+
+pool:
+  vmImage : windows-latest
+
+
+resources:
+  repositories:
+  - repository: ITDEV-APIToODS
+    type: git
+    name: dev-automation/ITDEV-APIToODS
+    ref: main
+    trigger:
+     branches:
+       include:
+         - main
+       exclude:
+         - pipeline
+
+
+stages:
+
+
+- stage: Prod_build
+  condition: contains(variables['Build.SourceBranch'], 'main')
+  jobs:
+  - job: Prod_build
+    variables:
+      currentDate: $[ format('{0:yyyy}.{0:MM}.{0:dd}.{0:HH}', pipeline.startTime) ]
+
+
+    steps:
+    - checkout: ITDEV-APIToODS
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Src'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/Production/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Env'
+        Contents: '**'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/Production/ITDevReleasePackages/Interop/$(Build.BuildNumber)'
+     
+    
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Publish files'
+      artifact: ProdArtifact
+
+- stage: Prod_Deploy
+  condition: succeeded('Prod_build')
+  variables:
+      - group: VariablesV1
+  jobs:
+    - deployment: 'Prod_Deploy'
+      displayName: 'Deploy the Artifact to PROD environment'
+      environment:
+       name: Prod
+       resourceType: VirtualMachine
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+
+          - task: DownloadBuildArtifacts@1
+            inputs:
+                buildType: 'current'
+                downloadType: 'single'
+                artifactName: 'ProdArtifact'
+                downloadPath: '\\envi2\test22'
+                
+        #  - task: CopyFiles@2
+         #   inputs:
+         #     SourceFolder: 'C:\azagent\A1\_work\1'
+         #       Contents: '**'
+       #         TargetFolder: '\\envi2\test22'
+          
+     #       - task: replacetokens@5
+      #        inputs:
+     #           rootDirectory: 'dsf'
+     #           targetFiles: '**/*.config'
+          
+
+     #       - task: DeleteFiles@1
+     #         inputs:
+     #           SourceFolder: 'ghjhjhj'
+     #           Contents: 'fghfgj'
